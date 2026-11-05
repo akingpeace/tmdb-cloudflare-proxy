@@ -12,6 +12,9 @@
   - 上传脚本 `tmdb-proxy`，建 DNS `tmdb.akingpeace.asia`(A 192.0.2.1, 橙色云)
   - 绑路由 `tmdb.akingpeace.asia/* → tmdb-proxy`
   - 状态：zone `pending`，待用户去注册商改 NS 后变 active 才真正可用
+  - DNS 迁移：已将原阿里云 A 记录 akingpeace.asia/www/mail → 47.108.183.149 及通配符
+    *.akingpeace.asia → 47.108.183.149 迁入 Cloudflare（均仅DNS灰云）；tmdb 保留橙云代理(192.0.2.1)
+    显式记录优先于通配符，故 tmdb 仍走 Worker
 - 用户凭证：API Token `cfat_...`（敏感，建议用后删除/设短 TTL）；TMDB_API_KEY 未设置，调用时自带 `?api_key=`
 - 交付文件：`tmdb-cloudflare-proxy/worker.js`、`wrangler.toml`、`README.md`
 

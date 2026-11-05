@@ -21,6 +21,20 @@
 > 代码已用 Cloudflare API 直接推送，无需再手动粘贴。
 > 经典格式（`addEventListener('fetch', ...)`），因为该脚本上传接口只接受经典格式。
 
+### DNS 记录（已从阿里云迁入 Cloudflare）
+改 NS 后，原阿里云"云解析"的记录会失效，已全部在 Cloudflare 重建，避免站点/服务断联：
+
+| 记录 | 值 | 云 |
+| --- | --- | --- |
+| `akingpeace.asia` (A) | `47.108.183.149` | 仅 DNS（灰） |
+| `*.akingpeace.asia` (A 通配符) | `47.108.183.149` | 仅 DNS（灰） |
+| `www.akingpeace.asia` (A) | `47.108.183.149` | 仅 DNS（灰） |
+| `mail.akingpeace.asia` (A) | `47.108.183.149` | 仅 DNS（灰） |
+| `tmdb.akingpeace.asia` (A) | `192.0.2.1` | 代理（橙，走 Worker） |
+
+> 说明：`tmdb` 子域故意保留为 Worker 代理，不能指向你的服务器 IP，否则 TMDB 反代失效；
+> 通配符 `*` 兜底其余所有子域指向服务器 `47.108.183.149`（显式记录优先于通配符，故 `tmdb` 仍走代理）。
+
 ---
 
 ## ⚠️ 你还得做一步：改 NS（注册商后台）
