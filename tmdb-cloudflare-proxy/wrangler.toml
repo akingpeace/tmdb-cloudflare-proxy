@@ -1,0 +1,24 @@
+name = "tmdb-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# 账号 ID 可留空，首次部署时 wrangler 会提示登录并自动写入
+# account_id = ""
+
+# ---------- 图片反代（部署时：wrangler deploy --env img）----------
+[env.img]
+name = "tmdb-proxy-img"
+vars = { UPSTREAM_HOST = "image.tmdb.org" }
+# 可选：把 key 放在这里会被明文写入文件，建议改用 `wrangler secret put TMDB_API_KEY --env img`
+# vars = { UPSTREAM_HOST = "image.tmdb.org", TMDB_API_KEY = "你的KEY" }
+
+# ---------- API 反代（部署时：wrangler deploy --env api）----------
+[env.api]
+name = "tmdb-proxy-api"
+vars = { UPSTREAM_HOST = "api.themoviedb.org" }
+# API 通常需要 key：建议 `wrangler secret put TMDB_API_KEY --env api`
+# vars = { UPSTREAM_HOST = "api.themoviedb.org", TMDB_API_KEY = "你的KEY" }
+
+# 路由（域名需已接入 Cloudflare 且 DNS 为橙色云）：
+#   wrangler routes add "img.你的域名.com/*" --env img
+#   wrangler routes add "api.你的域名.com/*" --env api
