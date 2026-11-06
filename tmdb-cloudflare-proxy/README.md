@@ -16,7 +16,7 @@
 | Worker 脚本名 | `tmdb-proxy`（经典 service-worker 格式） |
 | 路由 | `tmdb.akingpeace.asia/* → tmdb-proxy` |
 | DNS 记录 | `tmdb.akingpeace.asia` A `192.0.2.1`（橙色云 / 已代理） |
-| Zone 状态 | `pending` → 需改 NS 后变 `active` |
+| Zone 状态 | `active`（NS 已生效，2026-11-06 实测通过） |
 
 > 代码已用 Cloudflare API 直接推送，无需再手动粘贴。
 > 经典格式（`addEventListener('fetch', ...)`），因为该脚本上传接口只接受经典格式。
@@ -37,7 +37,7 @@
 
 ---
 
-## ⚠️ 你还得做一步：改 NS（注册商后台）
+## ✅ 改 NS 步骤（已完成 · 2026-11-06 NS 已生效）
 
 域名要真正跑起来，必须把解析服务器改成 Cloudflare 分配的这两个：
 
@@ -53,7 +53,9 @@ porter.ns.cloudflare.com
 4. 保存。NS 全球生效通常几分钟~24 小时，生效后 Cloudflare 里 zone 状态会从
    `pending` 变 `active`，代理即可用。
 
-可在 Cloudflare 面板 **Overview** 页看到生效进度（会提示 "Pending nameserver update"）。
+> ✅ **实测记录（2026-11-06）**：阿里云 NS 已切换为 Cloudflare，zone 状态已变 `active`。
+> 实测 `tmdb.akingpeace.asia/3/movie/550` 返回 401（链路通，仅缺 api_key），
+> 图片端点 `/t/p/w500/真实海报.jpg` 返回 200，代理全部正常。
 
 ---
 
@@ -77,11 +79,11 @@ NS 生效后，把原 URL 的 host 换成 `tmdb.akingpeace.asia`，路径和参�
 ## 验证
 
 ```bash
-# 等 NS 生效后执行（预期返回 TMDB API 的 JSON；401 表示没带 api_key 是正常的）
+# 已生效，实测：无 key 返回 401（链路正常），带 key 返回 JSON
 curl "https://tmdb.akingpeace.asia/3/movie/550?api_key=你的KEY"
 
-# 图片
-curl -I "https://tmdb.akingpeace.asia/t/p/w500/wrO0m0nNYkz3oEhoS6HvWmVQhSo.jpg"
+# 图片（已实测返回 200）
+curl -I "https://tmdb.akingpeace.asia/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg"
 ```
 
 ---
