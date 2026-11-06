@@ -112,3 +112,30 @@ curl -I "https://tmdb.akingpeace.asia/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg"
   或用 Cloudflare Access 限制来源。
 - **Token 安全**：本次用的 API Token 是敏感凭证，建议用完后到
   `dash.cloudflare.com/profile/api-tokens` 删掉或设短 TTL。
+
+---
+
+## 服务器本地缓存代理 + 控制台（2026-11-06 新增）
+
+服务器本身**连不上 TMDB**（被墙），所以 CF Worker 那层边缘缓存只解决了"少连 TMDB"，
+但每次应用请求仍会打到 Cloudflare（吃 10 万/天的额度）。为**进一步减少 Cloudflare 访问次数**，
+在服务器本地又加了一层磁盘缓存代理 + 可视化控制台，形成「双重缓存」：
+
+```
+应用/Jellyfin → 服务器 :8089（本地缓存，命中不打 CF）
+             → tmdb.akingpeace.asia（CF 边缘缓存，命中不打 TMDB）
+             → TMDB
+```
+
+- 程序：`server.js`（零依赖 Node，同一个进程兼做缓存代理与控制台）
+- 托管：`tmdb-proxy.service`（systemd，崩溃自启 + 开机自启，状态 `active`）
+- 服务地址：`http://<服务器IP或内网IP>:8089`
+- 控制台：`http://<服务器IP>:8089/dashboard`，输入令牌即可看实时缓存数据 + 接入方
+  - 令牌：`tmdbProxY8k2`（见 `tmdb-proxy.service` 的 `TMDB_ADMIN_TOKEN`，可自行修改）
+- 接入方式：把你的应用（Jellyfin/Emby/自建服务）的 TMDB 基础 URL 改成
+  `http://<服务器IP>:8089`；JSON 里的图片地址会被改写成该地址，图片也一并走本地缓存。
+- 缓存策略：API 缓存 12h、图片缓存 7d；缓存落盘 `/var/cache/tmdb-proxy`，重启不丢。
+- 日志：`/var/log/tmdb-proxy.log`
+
+> 关键点：服务器回源目标是 `tmdb.akingpeace.asia`（CF 层，服务器能连），**不是直连 TMDB**。
+> 若要从公网或其他机器访问 `:8089`，需在阿里云安全组放行 8089 入站规则。

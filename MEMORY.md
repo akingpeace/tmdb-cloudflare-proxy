@@ -16,7 +16,15 @@
     *.akingpeace.asia → 47.108.183.149 迁入 Cloudflare（均仅DNS灰云）；tmdb 保留橙云代理(192.0.2.1)
     显式记录优先于通配符，故 tmdb 仍走 Worker
 - 用户凭证：API Token `cfat_...`（敏感，建议用后删除/设短 TTL）；TMDB_API_KEY 未设置，调用时自带 `?api_key=`
-- 交付文件：`tmdb-cloudflare-proxy/worker.js`、`wrangler.toml`、`README.md`
+- 交付文件：`tmdb-cloudflare-proxy/worker.js`、`wrangler.toml`、`README.md`、`server.js`、`tmdb-proxy.service`
+- 2026-11-06 新增：服务器本地缓存代理 + 控制台（双重缓存，进一步省 CF 额度）
+  - 动因：服务器连不上 TMDB（被墙）；CF Worker 边缘缓存已减少连 TMDB，但每次仍打 CF 吃额度
+    → 在 47.108.183.149:8089 起 Node 服务(server.js)做本地磁盘缓存，回源 CF(tmdb.akingpeace.asia)
+  - 部署：/opt/tmdb-proxy/server.js，systemd 托管 tmdb-proxy.service（active，崩溃/开机自启）
+  - 控制台：http://47.108.183.149:8089/dashboard，令牌 tmdbProxY8k2（TMDB_ADMIN_TOKEN）
+  - 接入：应用把 TMDB base URL 改为 http://47.108.183.149:8089（图片被改写一并走本地缓存）
+  - 缓存落盘 /var/cache/tmdb-proxy，API 12h / 图片 7d；日志 /var/log/tmdb-proxy.log
+  - 注意：服务器 OpenResty 是 1panel 管的(80/443)，本服务用独立 8089 端口，不冲突
 
 ## 用户偏好（贯穿）
 - 每改完/做完一个任务要 commit，格式「新增了xxx, 优化了xxx, 修复了xxx」。

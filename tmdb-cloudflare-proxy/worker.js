@@ -1,9 +1,10 @@
 /**
  * TMDB 反向代理 Worker（service-worker 经典格式，兼容简单上传）
  * ---------------------------------------------------------------
- * 单域名智能路由：
- *   - 路径以 /t/ 开头  → image.tmdb.org（海报/剧照 CDN）
- *   - 其余路径         → api.themoviedb.org（API）
+ * 单域名智能路由 + 边缘缓存（Cache API）：
+ *   - 命中缓存直接返回，完全不回源 TMDB；未命中才回源并缓存。
+ *   - 路径以 /t/ 开头  → image.tmdb.org（图片 CDN，缓存 1 天）
+ *   - 其余路径         → api.themoviedb.org（API，缓存 1 小时）
  * 并把 API 返回 JSON 里的 image.tmdb.org 自动改写成当前域名，
  * 让图片也一并走反代。
  *
@@ -13,12 +14,35 @@
  * ---------------------------------------------------------------
  */
 
-async function handleRequest(request) {
+async function handleRequest(request, event) {
   const url = new URL(request.url);
   const self = url.host;                          // 当前访问域名（反代自身）
   const isImage = url.pathname.startsWith('/t/');
   const upstream = isImage ? 'image.tmdb.org' : 'api.themoviedb.org';
   url.hostname = upstream;
+
+  // CORS 预检直接放行，不做缓存
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders() });
+  }
+
+  // 仅对 GET 且未带 Authorization 头的请求做缓存：
+  //   - 避免不同 token 通过 Authorization 头串数据（api_key 在 query 中，
+  //     会作为缓存 key 一部分天然隔离，可安全缓存）
+  //   - 缓存 key 只取 URL，剔除 Authorization，保证同一资源稳定命中
+  const cacheable = request.method === 'GET' && !request.headers.get('Authorization');
+  const cache = caches.default;
+  const cacheKey = new Request(url.toString(), { method: 'GET' });
+
+  if (cacheable) {
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      const headers = new Headers(cached.headers);
+      headers.set('X-Cache', 'HIT');
+      Object.entries(corsHeaders()).forEach(([k, v]) => headers.set(k, v));
+      return new Response(cached.body, { status: cached.status, headers });
+    }
+  }
 
   // 可选：在 Worker 层统一注入 API Key（没传 key / 没带 Authorization 时才补）
   const hasAuth =
@@ -26,11 +50,6 @@ async function handleRequest(request) {
   const apiKey = (typeof TMDB_API_KEY !== 'undefined') ? TMDB_API_KEY : null;
   if (apiKey && !hasAuth) {
     url.searchParams.set('api_key', apiKey);
-  }
-
-  // 浏览器直接调用时的 CORS 预检
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders() });
   }
 
   // 用上游 URL 重新构造请求，并修正 Host 头
@@ -61,13 +80,19 @@ async function handleRequest(request) {
   // 放开跨域，方便前端直接 fetch
   Object.entries(corsHeaders()).forEach(([k, v]) => response.headers.set(k, v));
 
-  // 缓存：图片边缘缓存 1 天，API 缓存 5 分钟
+  // 缓存时长：图片 1 天，API 1 小时（s-maxage 控制边缘缓存 TTL）
   response.headers.set(
     'Cache-Control',
     isImage
       ? 'public, max-age=86400, s-maxage=86400'
-      : 'public, max-age=300, s-maxage=300'
+      : 'public, max-age=3600, s-maxage=3600'
   );
+
+  // 命中后把响应写回边缘缓存（仅缓存 200 的成功响应）
+  if (cacheable && response.status === 200) {
+    response.headers.set('X-Cache', 'MISS');   // 让客户端也能看到首次回源标记
+    event.waitUntil(cache.put(cacheKey, response.clone()));
+  }
 
   return response;
 }
@@ -82,5 +107,5 @@ function corsHeaders() {
 }
 
 addEventListener('fetch', (event) => {
-  event.respondWith(handleRequest(event.request));
+  event.respondWith(handleRequest(event.request, event));
 });

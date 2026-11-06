@@ -1,0 +1,21 @@
+[Unit]
+Description=TMDB 服务器本地缓存代理 + 控制台
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/root/.volta/bin/node /opt/tmdb-proxy/server.js
+WorkingDirectory=/opt/tmdb-proxy
+Restart=always
+RestartSec=3
+User=root
+Environment=PORT=8089
+Environment=UPSTREAM_HOST=tmdb.akingpeace.asia
+Environment=TMDB_ADMIN_TOKEN=tmdbProxY8k2
+Environment=MAX_AGE_API_H=12
+Environment=MAX_AGE_IMG_D=7
+StandardOutput=append:/var/log/tmdb-proxy.log
+StandardError=append:/var/log/tmdb-proxy.log
+
+[Install]
+WantedBy=multi-user.target
