@@ -138,7 +138,9 @@ function proxy(req, res) {
       const ct = up.headers['content-type'] || '';
       // 改写域名：把 CF 域名与 image.tmdb.org 都改成"本服务"，让图片也走本地缓存
       if (ct.includes('json')) {
-        const selfBase = 'http://' + (req.headers['host'] || (UPSTREAM_HOST + ':' + PORT));
+        // 协议优先取 X-Forwarded-Proto(Cloudflare 橙云回源时会带上 https)，否则回退 http
+        const fwdProto = (req.headers['x-forwarded-proto'] || 'http').toString().split(',')[0].trim();
+        const selfBase = fwdProto + '://' + (req.headers['host'] || (UPSTREAM_HOST + ':' + PORT));
         const reUp = new RegExp('https://' + UPSTREAM_HOST.replace(/\./g, '\\.') + '(?=/|"|$)', 'g');
         let txt = buf.toString('utf8')
           .replace(reUp, selfBase)

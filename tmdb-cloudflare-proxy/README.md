@@ -139,3 +139,32 @@ curl -I "https://tmdb.akingpeace.asia/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg"
 
 > 关键点：服务器回源目标是 `tmdb.akingpeace.asia`（CF 层，服务器能连），**不是直连 TMDB**。
 > 若要从公网或其他机器访问 `:8089`，需在阿里云安全组放行 8089 入站规则。
+
+### 🌐 通过域名免 IP/端口访问（2026-11-06 完成）
+
+为免去"记 IP + 记端口"，已新增 **`console.akingpeace.asia`** 域名，经过 Cloudflare 橙云
+（无需 IP、无需端口、自动 HTTPS）直达控制台与缓存代理：
+
+```
+浏览器 → console.akingpeace.asia（Cloudflare 橙云）
+       → 服务器 OpenResty(:80/:443)
+       → 127.0.0.1:8089（server.js）
+       → tmdb.akingpeace.asia（CF 边缘缓存）→ TMDB
+```
+
+- 控制台：`https://console.akingpeace.asia/dashboard`（令牌同上 `tmdbProxY8k2`）
+- 统计 API：`https://console.akingpeace.asia/api/stats?token=tmdbProxY8k2`
+- 同时该域名也兼做 TMDB 缓存代理入口（把应用基础 URL 改成
+  `https://console.akingpeace.asia` 即可，图片地址会自动改写成该域名）
+
+实现要点：
+- Cloudflare DNS：新增 `console.akingpeace.asia` A 记录 → `47.108.183.149`，**橙色云（已代理）**。
+- 服务器侧反代配置：`console.akingpeace.asia.conf`，放在
+  `/opt/1panel/www/conf.d/`（该目录 bind 挂载进 OpenResty 容器
+  `1Panel-openresty-AFOK` 的 `/usr/local/openresty/nginx/conf/conf.d/`，改完需在容器内
+  `nginx -t && nginx -s reload`）。
+- 证书：zone SSL 模式为 `full`，故源站用**自签证书**即可（Cloudflare 接受任意证书）。
+  证书位于 `/opt/1panel/www/sites/console.akingpeace.asia/ssl/`
+  （fullchain.pem / privkey.pem，含 SAN `console.akingpeace.asia` 与 `*.akingpeace.asia`）。
+- `server.js` 已修正：JSON 里图片地址的协议改为读取 `X-Forwarded-Proto`（Cloudflare 回源带
+  `https`），避免公网下出现 `http://` 混合内容被浏览器拦截。
